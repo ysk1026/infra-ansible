@@ -25,7 +25,7 @@
   ansible.builtin.shell: |
     set -o pipefail
     ls -1 "{{ impala_artifact_dir }}"/*.deb 2>/dev/null \
-      | grep -E '/[^/]*impala[^/]*{{ impala_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*{{ impala_target_os_tag }}[^/]*{{ impala_target_arch }}[^/]*\.deb$' \
+      | grep -E '/[^/]*impala[^/]*{{ impala_major_minor }}([._-][0-9]+)?[^/]*{{ impala_target_os_tag }}[^/]*{{ impala_target_arch }}[^/]*\.deb$' \
       | sort -V \
       | tail -n 1
   args:

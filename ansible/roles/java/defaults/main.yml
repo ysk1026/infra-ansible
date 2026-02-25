@@ -1,2 +1,3 @@
 ---
-java_package_name: openjdk-17-jre-headless
+java_package_name: openjdk-11-jdk-headless
+java_home: /usr/lib/jvm/java-11-openjdk-amd64

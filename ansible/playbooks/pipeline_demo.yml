@@ -2,5 +2,7 @@
 - name: Hadoop ecosystem pipeline demo
   hosts: pipeline_runner
   become: true
+  vars_files:
+    - ../group_vars/all.yml
   roles:
     - pipeline_demo

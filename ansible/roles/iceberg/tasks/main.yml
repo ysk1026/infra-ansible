@@ -21,7 +21,7 @@
   ansible.builtin.shell: |
     set -o pipefail
     ls -1 "{{ iceberg_artifact_dir }}"/*.jar 2>/dev/null \
-      | grep -E '/[^/]*iceberg[^/]*{{ iceberg_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*\.jar$' \
+      | grep -E '/[^/]*iceberg[^/]*{{ iceberg_major_minor }}([._-][0-9]+)?[^/]*\.jar$' \
       | sort -V \
       | tail -n 1
   args:
