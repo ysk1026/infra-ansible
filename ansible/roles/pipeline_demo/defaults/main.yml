@@ -2,3 +2,9 @@
 pipeline_demo_enabled: true
 pipeline_demo_work_dir: /tmp/pipeline-demo
 pipeline_demo_message_count: 20
+pipeline_demo_hive_validation_mode: beeline
+pipeline_demo_hive_jdbc_host: "{{ hostvars[groups['hadoop_edge'][0]].ansible_host | default(groups['hadoop_edge'][0]) if groups.get('hadoop_edge', []) | length > 0 else '127.0.0.1' }}"
+pipeline_demo_hive_jdbc_port: "{{ hive_server2_port }}"
+pipeline_demo_hive_jdbc_db: default
+pipeline_demo_hive_jdbc_user: "{{ data_platform_user }}"
+pipeline_demo_hive_jdbc_url: "jdbc:hive2://{{ pipeline_demo_hive_jdbc_host }}:{{ pipeline_demo_hive_jdbc_port }}/{{ pipeline_demo_hive_jdbc_db }}"

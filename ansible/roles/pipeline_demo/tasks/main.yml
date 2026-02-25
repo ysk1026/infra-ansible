@@ -86,11 +86,27 @@
     group: "{{ data_platform_group }}"
     mode: "0644"
 
-- name: Validate curated dataset with Hive
+- name: Validate curated dataset with Hive via Beeline
+  ansible.builtin.command:
+    argv:
+      - "{{ hive_home }}/bin/beeline"
+      - "-u"
+      - "{{ pipeline_demo_hive_jdbc_url }}"
+      - "-n"
+      - "{{ pipeline_demo_hive_jdbc_user }}"
+      - "-f"
+      - "{{ pipeline_demo_work_dir }}/validate.sql"
+  become_user: "{{ data_platform_user }}"
+  register: hive_validation
+  changed_when: false
+  when: pipeline_demo_hive_validation_mode == "beeline"
+
+- name: Validate curated dataset with Hive CLI (legacy)
   ansible.builtin.command: "{{ hive_home }}/bin/hive -f {{ pipeline_demo_work_dir }}/validate.sql"
   become_user: "{{ data_platform_user }}"
   register: hive_validation
   changed_when: false
+  when: pipeline_demo_hive_validation_mode == "cli"
 
 - name: Validate curated dataset with Impala when available
   ansible.builtin.shell: |
