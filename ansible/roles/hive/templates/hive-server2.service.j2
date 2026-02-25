@@ -1,0 +1,16 @@
+[Unit]
+Description=Hive Server2
+After=network.target hive-metastore.service
+
+[Service]
+Type=simple
+User={{ data_platform_user }}
+Group={{ data_platform_group }}
+Environment=HADOOP_HOME={{ hadoop_home }}
+Environment=HIVE_HOME={{ hive_home }}
+Environment=HIVE_CONF_DIR={{ hive_conf_dir }}
+ExecStart={{ hive_home }}/bin/hive --service hiveserver2
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

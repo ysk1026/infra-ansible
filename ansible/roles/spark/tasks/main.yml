@@ -1,0 +1,95 @@
+---
+- name: Skip Spark when disabled
+  ansible.builtin.meta: end_role
+  when: not spark_enabled
+
+- name: Ensure Spark artifact directory exists
+  ansible.builtin.stat:
+    path: "{{ spark_artifact_dir }}"
+  register: spark_artifact_dir_stat
+
+- name: Fail when Spark artifact directory is missing
+  ansible.builtin.fail:
+    msg: "Missing local Spark artifact dir: {{ spark_artifact_dir }}"
+  when: not spark_artifact_dir_stat.stat.exists
+
+- name: Resolve Spark major.minor selector
+  ansible.builtin.set_fact:
+    spark_major_minor: "{{ spark_version | regex_replace('^([0-9]+\\.[0-9]+).*$','\\1') }}"
+
+- name: Pick Spark archive from local artifacts
+  ansible.builtin.shell: |
+    set -o pipefail
+    ls -1 "{{ spark_artifact_dir }}"/*.tar.gz "{{ spark_artifact_dir }}"/*.tgz 2>/dev/null \
+      | grep -E '/[^/]*spark[^/]*{{ spark_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*\.(tar\.gz|tgz)$' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: spark_archive
+  changed_when: false
+  failed_when: false
+
+- name: Fail when matching Spark artifact is not found
+  ansible.builtin.fail:
+    msg: "No Spark artifact matching major.minor={{ spark_major_minor }} in {{ spark_artifact_dir }}"
+  when: spark_archive.stdout | trim == ''
+
+- name: Ensure Spark runtime directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0755"
+  loop:
+    - "{{ spark_home }}"
+    - "{{ spark_conf_dir }}"
+
+- name: Unarchive Spark into versioned home
+  ansible.builtin.unarchive:
+    src: "{{ spark_archive.stdout | trim }}"
+    dest: "{{ spark_home }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ spark_home }}/bin"
+
+- name: Render Spark configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+  loop:
+    - { src: "spark-defaults.conf.j2", dest: "{{ spark_conf_dir }}/spark-defaults.conf" }
+    - { src: "spark-env.sh.j2", dest: "{{ spark_conf_dir }}/spark-env.sh" }
+
+- name: Ensure Spark event log directory exists on HDFS
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs dfs -mkdir -p /spark-logs"
+  become_user: "{{ data_platform_user }}"
+  changed_when: false
+  failed_when: false
+  when: inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Install Spark history server service
+  ansible.builtin.template:
+    src: spark-history-server.service.j2
+    dest: /etc/systemd/system/spark-history-server.service
+    mode: "0644"
+  when: inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Reload systemd for Spark services
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Start Spark history service
+  ansible.builtin.systemd:
+    name: spark-history-server.service
+    enabled: true
+    state: started
+  when:
+    - start_spark_services
+    - inventory_hostname in groups.get('hadoop_edge', [])

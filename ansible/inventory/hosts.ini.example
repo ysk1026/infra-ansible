@@ -1,0 +1,50 @@
+[hadoop_namenode]
+# nn01 ansible_host=10.0.10.11
+
+[hadoop_datanode]
+# dn01 ansible_host=10.0.10.21
+# dn02 ansible_host=10.0.10.22
+
+[hadoop_edge]
+# edge01 ansible_host=10.0.10.31
+
+[kafka_broker]
+# edge01
+
+[kafka_zookeeper]
+# edge01
+
+[impala_catalog]
+# edge01
+
+[impala_daemon]
+# edge01
+
+[pipeline_runner]
+# edge01
+
+[k8s_control_plane]
+# cp01 ansible_host=10.0.20.11
+
+[k8s_workers]
+# wk01 ansible_host=10.0.20.21
+# wk02 ansible_host=10.0.20.22
+
+[hadoop:children]
+hadoop_namenode
+hadoop_datanode
+hadoop_edge
+kafka_broker
+kafka_zookeeper
+impala_catalog
+impala_daemon
+pipeline_runner
+
+[k8s_cluster:children]
+k8s_control_plane
+k8s_workers
+
+[all:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+ansible_become=true

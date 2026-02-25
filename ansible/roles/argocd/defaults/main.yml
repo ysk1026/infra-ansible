@@ -1,0 +1,3 @@
+---
+argocd_bootstrap_enabled: true
+gitops_root_application: "{{ playbook_dir }}/../../gitops/cluster/root-application.yaml"

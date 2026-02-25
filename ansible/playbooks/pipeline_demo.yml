@@ -1,0 +1,6 @@
+---
+- name: Hadoop ecosystem pipeline demo
+  hosts: pipeline_runner
+  become: true
+  roles:
+    - pipeline_demo

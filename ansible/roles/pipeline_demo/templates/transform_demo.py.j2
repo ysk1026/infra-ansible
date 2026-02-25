@@ -1,0 +1,37 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+spark = (
+    SparkSession.builder
+    .appName("demo-pipeline")
+    .enableHiveSupport()
+    .getOrCreate()
+)
+
+raw = spark.read.json("{{ pipeline_demo_hdfs_raw_path }}")
+curated = raw.select(
+    col("event_id").cast("int"),
+    col("user_id"),
+    col("amount").cast("int"),
+    col("event_time")
+)
+
+curated.write.mode("overwrite").parquet("{{ pipeline_demo_hdfs_curated_path }}")
+
+spark.sql("CREATE DATABASE IF NOT EXISTS {{ pipeline_demo_hive_db }}")
+spark.sql("DROP TABLE IF EXISTS {{ pipeline_demo_hive_db }}.{{ pipeline_demo_hive_table }}")
+spark.sql(
+    """
+    CREATE EXTERNAL TABLE {{ pipeline_demo_hive_db }}.{{ pipeline_demo_hive_table }} (
+      event_id INT,
+      user_id STRING,
+      amount INT,
+      event_time STRING
+    ) STORED AS PARQUET
+    LOCATION '{{ pipeline_demo_hdfs_curated_path }}'
+    """
+)
+
+count_df = spark.sql("SELECT count(*) AS cnt FROM {{ pipeline_demo_hive_db }}.{{ pipeline_demo_hive_table }}")
+count_df.show(truncate=False)
+spark.stop()

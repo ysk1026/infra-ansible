@@ -1,0 +1,14 @@
+[Unit]
+Description=Kafka ZooKeeper
+After=network.target
+
+[Service]
+Type=simple
+User={{ data_platform_user }}
+Group={{ data_platform_group }}
+ExecStart={{ kafka_home }}/bin/zookeeper-server-start.sh {{ kafka_conf_dir }}/zookeeper.properties
+ExecStop={{ kafka_home }}/bin/zookeeper-server-stop.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

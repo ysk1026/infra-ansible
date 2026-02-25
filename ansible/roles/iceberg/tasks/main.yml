@@ -1,0 +1,53 @@
+---
+- name: Skip Iceberg when disabled
+  ansible.builtin.meta: end_role
+  when: not iceberg_enabled
+
+- name: Ensure Iceberg artifact directory exists
+  ansible.builtin.stat:
+    path: "{{ iceberg_artifact_dir }}"
+  register: iceberg_artifact_dir_stat
+
+- name: Fail when Iceberg artifact directory is missing
+  ansible.builtin.fail:
+    msg: "Missing local Iceberg artifact dir: {{ iceberg_artifact_dir }}"
+  when: not iceberg_artifact_dir_stat.stat.exists
+
+- name: Resolve Iceberg major.minor selector
+  ansible.builtin.set_fact:
+    iceberg_major_minor: "{{ iceberg_version | regex_replace('^([0-9]+\\.[0-9]+).*$','\\1') }}"
+
+- name: Pick Iceberg runtime jar from local artifacts
+  ansible.builtin.shell: |
+    set -o pipefail
+    ls -1 "{{ iceberg_artifact_dir }}"/*.jar 2>/dev/null \
+      | grep -E '/[^/]*iceberg[^/]*{{ iceberg_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*\.jar$' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: iceberg_jar
+  changed_when: false
+  failed_when: false
+
+- name: Fail when matching Iceberg artifact is not found
+  ansible.builtin.fail:
+    msg: "No Iceberg jar matching major.minor={{ iceberg_major_minor }} in {{ iceberg_artifact_dir }}"
+  when: iceberg_jar.stdout | trim == ''
+
+- name: Ensure Iceberg target directory exists
+  ansible.builtin.file:
+    path: "{{ iceberg_target_dir }}"
+    state: directory
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0755"
+
+- name: Copy Iceberg runtime jar into target directory
+  ansible.builtin.copy:
+    src: "{{ iceberg_jar.stdout | trim }}"
+    dest: "{{ iceberg_target_dir }}/"
+    remote_src: true
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"

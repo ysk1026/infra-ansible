@@ -1,0 +1,6 @@
+CREATE DATABASE IF NOT EXISTS {{ pipeline_demo_hive_db }};
+SELECT count(*) AS event_count FROM {{ pipeline_demo_hive_db }}.{{ pipeline_demo_hive_table }};
+SELECT user_id, sum(amount) AS total_amount
+FROM {{ pipeline_demo_hive_db }}.{{ pipeline_demo_hive_table }}
+GROUP BY user_id
+ORDER BY user_id;

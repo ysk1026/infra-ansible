@@ -1,0 +1,96 @@
+---
+- name: Skip Kafka when disabled
+  ansible.builtin.meta: end_role
+  when: not kafka_enabled
+
+- name: Ensure Kafka artifact directory exists
+  ansible.builtin.stat:
+    path: "{{ kafka_artifact_dir }}"
+  register: kafka_artifact_dir_stat
+
+- name: Fail when Kafka artifact directory is missing
+  ansible.builtin.fail:
+    msg: "Missing local Kafka artifact dir: {{ kafka_artifact_dir }}"
+  when: not kafka_artifact_dir_stat.stat.exists
+
+- name: Resolve Kafka major.minor selector
+  ansible.builtin.set_fact:
+    kafka_major_minor: "{{ kafka_version | regex_replace('^([0-9]+\\.[0-9]+).*$','\\1') }}"
+
+- name: Pick Kafka archive from local artifacts
+  ansible.builtin.shell: |
+    set -o pipefail
+    ls -1 "{{ kafka_artifact_dir }}"/*.tar.gz "{{ kafka_artifact_dir }}"/*.tgz 2>/dev/null \
+      | grep -E '/[^/]*kafka[^/]*{{ kafka_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*\.(tar\.gz|tgz)$' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: kafka_archive
+  changed_when: false
+  failed_when: false
+
+- name: Fail when matching Kafka artifact is not found
+  ansible.builtin.fail:
+    msg: "No Kafka artifact matching major.minor={{ kafka_major_minor }} in {{ kafka_artifact_dir }}"
+  when: kafka_archive.stdout | trim == ''
+
+- name: Ensure Kafka runtime directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0755"
+  loop:
+    - "{{ kafka_home }}"
+    - "{{ kafka_data_root }}"
+    - "{{ kafka_data_root }}/zookeeper"
+    - "{{ kafka_data_root }}/broker-logs"
+
+- name: Unarchive Kafka into versioned home
+  ansible.builtin.unarchive:
+    src: "{{ kafka_archive.stdout | trim }}"
+    dest: "{{ kafka_home }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ kafka_home }}/bin"
+
+- name: Render Kafka configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+  loop:
+    - { src: "zookeeper.properties.j2", dest: "{{ kafka_conf_dir }}/zookeeper.properties" }
+    - { src: "server.properties.j2", dest: "{{ kafka_conf_dir }}/server.properties" }
+
+- name: Install Kafka systemd units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.name }}"
+    mode: "0644"
+  loop:
+    - { src: "kafka-zookeeper.service.j2", name: "kafka-zookeeper.service" }
+    - { src: "kafka-broker.service.j2", name: "kafka-broker.service" }
+
+- name: Reload systemd for Kafka services
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Start Kafka ZooKeeper service
+  ansible.builtin.systemd:
+    name: kafka-zookeeper.service
+    enabled: true
+    state: started
+  when: start_kafka_services and inventory_hostname in groups.get('kafka_zookeeper', [])
+
+- name: Start Kafka broker service
+  ansible.builtin.systemd:
+    name: kafka-broker.service
+    enabled: true
+    state: started
+  when: start_kafka_services and inventory_hostname in groups.get('kafka_broker', [])

@@ -1,0 +1,16 @@
+[Unit]
+Description=Hive Metastore
+After=network.target hadoop-namenode.service
+
+[Service]
+Type=simple
+User={{ data_platform_user }}
+Group={{ data_platform_group }}
+Environment=HADOOP_HOME={{ hadoop_home }}
+Environment=HIVE_HOME={{ hive_home }}
+Environment=HIVE_CONF_DIR={{ hive_conf_dir }}
+ExecStart={{ hive_home }}/bin/hive --service metastore
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

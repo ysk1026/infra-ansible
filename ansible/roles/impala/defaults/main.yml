@@ -1,0 +1,9 @@
+---
+impala_enabled: true
+impala_artifact_dir: "{{ local_artifact_root }}/impala"
+impala_target_os_tag: ubuntu-22.04
+impala_target_arch: x86_64
+impala_service_candidates:
+  - impala-state-store
+  - impala-catalog
+  - impala-server

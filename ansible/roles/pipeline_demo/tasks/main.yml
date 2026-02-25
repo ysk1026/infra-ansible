@@ -1,0 +1,105 @@
+---
+- name: Skip pipeline demo when disabled
+  ansible.builtin.meta: end_role
+  when: not pipeline_demo_enabled
+
+- name: Ensure pipeline work directory exists
+  ansible.builtin.file:
+    path: "{{ pipeline_demo_work_dir }}"
+    state: directory
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0755"
+
+- name: Render demo input events
+  ansible.builtin.template:
+    src: events.jsonl.j2
+    dest: "{{ pipeline_demo_work_dir }}/events.jsonl"
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+
+- name: Ensure Kafka topic exists
+  ansible.builtin.shell: |
+    set -o pipefail
+    {{ kafka_home }}/bin/kafka-topics.sh \
+      --bootstrap-server {{ kafka_bootstrap_server }} \
+      --create --if-not-exists --topic {{ pipeline_demo_topic }} --partitions 1 --replication-factor 1
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Publish demo events to Kafka
+  ansible.builtin.shell: |
+    set -o pipefail
+    cat {{ pipeline_demo_work_dir }}/events.jsonl | {{ kafka_home }}/bin/kafka-console-producer.sh \
+      --bootstrap-server {{ kafka_bootstrap_server }} \
+      --topic {{ pipeline_demo_topic }}
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Consume events from Kafka into local staging file
+  ansible.builtin.shell: |
+    set -o pipefail
+    {{ kafka_home }}/bin/kafka-console-consumer.sh \
+      --bootstrap-server {{ kafka_bootstrap_server }} \
+      --topic {{ pipeline_demo_topic }} \
+      --from-beginning \
+      --max-messages {{ pipeline_demo_message_count }} \
+      > {{ pipeline_demo_work_dir }}/consumed.jsonl
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Ensure raw HDFS directory exists
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs dfs -mkdir -p {{ pipeline_demo_hdfs_raw_path | dirname }}"
+  become_user: "{{ data_platform_user }}"
+  changed_when: false
+
+- name: Upload raw file to HDFS
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs dfs -put -f {{ pipeline_demo_work_dir }}/consumed.jsonl {{ pipeline_demo_hdfs_raw_path }}"
+  become_user: "{{ data_platform_user }}"
+  changed_when: true
+
+- name: Render Spark transform job
+  ansible.builtin.template:
+    src: transform_demo.py.j2
+    dest: "{{ pipeline_demo_work_dir }}/transform_demo.py"
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0755"
+
+- name: Run Spark transform job
+  ansible.builtin.command: "{{ spark_home }}/bin/spark-submit {{ pipeline_demo_work_dir }}/transform_demo.py"
+  become_user: "{{ data_platform_user }}"
+  environment:
+    HADOOP_CONF_DIR: "{{ hadoop_conf_dir }}"
+    SPARK_CONF_DIR: "{{ spark_conf_dir }}"
+  changed_when: true
+
+- name: Render Hive validation query
+  ansible.builtin.template:
+    src: validate.sql.j2
+    dest: "{{ pipeline_demo_work_dir }}/validate.sql"
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+
+- name: Validate curated dataset with Hive
+  ansible.builtin.command: "{{ hive_home }}/bin/hive -f {{ pipeline_demo_work_dir }}/validate.sql"
+  become_user: "{{ data_platform_user }}"
+  register: hive_validation
+  changed_when: false
+
+- name: Validate curated dataset with Impala when available
+  ansible.builtin.shell: |
+    set -o pipefail
+    if command -v impala-shell >/dev/null 2>&1; then
+      impala-shell -q "invalidate metadata; select count(*) from {{ pipeline_demo_hive_db }}.{{ pipeline_demo_hive_table }};"
+    else
+      echo "impala-shell not found; skipped"
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: false

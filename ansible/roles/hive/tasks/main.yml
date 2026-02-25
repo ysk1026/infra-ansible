@@ -1,0 +1,115 @@
+---
+- name: Skip Hive when disabled
+  ansible.builtin.meta: end_role
+  when: not hive_enabled
+
+- name: Ensure Hive artifact directory exists
+  ansible.builtin.stat:
+    path: "{{ hive_artifact_dir }}"
+  register: hive_artifact_dir_stat
+
+- name: Fail when Hive artifact directory is missing
+  ansible.builtin.fail:
+    msg: "Missing local Hive artifact dir: {{ hive_artifact_dir }}"
+  when: not hive_artifact_dir_stat.stat.exists
+
+- name: Resolve Hive major.minor selector
+  ansible.builtin.set_fact:
+    hive_major_minor: "{{ hive_version | regex_replace('^([0-9]+\\.[0-9]+).*$','\\1') }}"
+
+- name: Pick Hive archive from local artifacts
+  ansible.builtin.shell: |
+    set -o pipefail
+    ls -1 "{{ hive_artifact_dir }}"/*.tar.gz "{{ hive_artifact_dir }}"/*.tgz 2>/dev/null \
+      | grep -E '/[^/]*(hive|apache-hive)[^/]*{{ hive_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*\.(tar\.gz|tgz)$' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: hive_archive
+  changed_when: false
+  failed_when: false
+
+- name: Fail when matching Hive artifact is not found
+  ansible.builtin.fail:
+    msg: "No Hive artifact matching major.minor={{ hive_major_minor }} in {{ hive_artifact_dir }}"
+  when: hive_archive.stdout | trim == ''
+
+- name: Ensure Hive runtime directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0755"
+  loop:
+    - "{{ hive_home }}"
+    - "{{ hive_data_root }}"
+
+- name: Unarchive Hive into versioned home
+  ansible.builtin.unarchive:
+    src: "{{ hive_archive.stdout | trim }}"
+    dest: "{{ hive_home }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ hive_home }}/bin"
+
+- name: Render Hive config files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+  loop:
+    - { src: "hive-site.xml.j2", dest: "{{ hive_conf_dir }}/hive-site.xml" }
+    - { src: "hive-env.sh.j2", dest: "{{ hive_conf_dir }}/hive-env.sh" }
+
+- name: Initialize Hive schema once
+  ansible.builtin.command: "{{ hive_home }}/bin/schematool -dbType derby -initSchema"
+  become_user: "{{ data_platform_user }}"
+  args:
+    creates: "{{ hive_data_root }}/.schema_initialized"
+  register: hive_schema_init
+  failed_when: false
+  when: inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Mark Hive schema initialized
+  ansible.builtin.file:
+    path: "{{ hive_data_root }}/.schema_initialized"
+    state: touch
+    owner: "{{ data_platform_user }}"
+    group: "{{ data_platform_group }}"
+    mode: "0644"
+  when:
+    - inventory_hostname in groups.get('hadoop_edge', [])
+    - hive_schema_init.rc is defined
+    - hive_schema_init.rc == 0
+
+- name: Install Hive systemd units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.name }}"
+    mode: "0644"
+  loop:
+    - { src: "hive-metastore.service.j2", name: "hive-metastore.service" }
+    - { src: "hive-server2.service.j2", name: "hive-server2.service" }
+  when: inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Reload systemd for Hive services
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Start Hive services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - hive-metastore.service
+    - hive-server2.service
+  when:
+    - start_hive_services
+    - inventory_hostname in groups.get('hadoop_edge', [])

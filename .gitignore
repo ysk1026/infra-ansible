@@ -1,0 +1,4 @@
+*.retry
+*.log
+.ansible/
+ansible/inventory/hosts.ini

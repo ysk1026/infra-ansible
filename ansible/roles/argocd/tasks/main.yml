@@ -1,0 +1,8 @@
+---
+- name: Skip Argo CD bootstrap when disabled
+  ansible.builtin.meta: end_role
+  when: not argocd_bootstrap_enabled
+
+- name: Bootstrap Argo CD and root application from control plane host
+  ansible.builtin.debug:
+    msg: "Use infra/scripts/bootstrap-gitops.sh on operator machine after kubeconfig is configured."

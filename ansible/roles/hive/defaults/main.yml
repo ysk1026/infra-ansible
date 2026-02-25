@@ -1,0 +1,8 @@
+---
+hive_enabled: true
+hive_artifact_dir: "{{ local_artifact_root }}/hive"
+hive_conf_dir: "{{ hive_home }}/conf"
+hive_metastore_port: 9083
+hive_server2_port: 10000
+hive_metastore_host: "{{ hostvars[groups['hadoop_edge'][0]].ansible_host | default(groups['hadoop_edge'][0]) if groups.get('hadoop_edge', []) | length > 0 else hadoop_namenode_host }}"
+hive_warehouse_dir: /warehouse/tablespace/managed/hive

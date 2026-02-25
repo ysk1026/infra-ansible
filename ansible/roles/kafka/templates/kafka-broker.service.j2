@@ -1,0 +1,14 @@
+[Unit]
+Description=Kafka Broker
+After=network.target kafka-zookeeper.service
+
+[Service]
+Type=simple
+User={{ data_platform_user }}
+Group={{ data_platform_group }}
+ExecStart={{ kafka_home }}/bin/kafka-server-start.sh {{ kafka_conf_dir }}/server.properties
+ExecStop={{ kafka_home }}/bin/kafka-server-stop.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

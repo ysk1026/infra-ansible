@@ -1,0 +1,26 @@
+---
+- name: Baseline and Hadoop ecosystem setup
+  hosts: hadoop
+  become: true
+  roles:
+    - common
+    - java
+    - hadoop
+    - hive
+    - spark
+    - kafka
+    - impala
+    - iceberg
+
+- name: Kubernetes cluster bootstrap (optional)
+  hosts: k8s_cluster
+  become: true
+  roles:
+    - common
+    - kubeadm
+
+- name: Argo CD bootstrap helper (optional)
+  hosts: k8s_control_plane
+  become: false
+  roles:
+    - argocd

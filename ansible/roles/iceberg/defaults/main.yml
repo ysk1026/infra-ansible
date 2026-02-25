@@ -1,0 +1,4 @@
+---
+iceberg_enabled: true
+iceberg_artifact_dir: "{{ local_artifact_root }}/iceberg"
+iceberg_target_dir: "{{ spark_home }}/jars"

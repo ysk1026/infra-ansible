@@ -1,0 +1,166 @@
+---
+- name: Ensure Hadoop group exists
+  ansible.builtin.group:
+    name: "{{ hadoop_group }}"
+    state: present
+
+- name: Ensure Hadoop user exists
+  ansible.builtin.user:
+    name: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    create_home: true
+
+- name: Ensure runtime directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(hadoop_user) }}"
+    group: "{{ item.group | default(hadoop_group) }}"
+    mode: "0755"
+  loop:
+    - { path: "{{ stack_root }}" }
+    - { path: "{{ data_root }}" }
+    - { path: "{{ hadoop_data_root }}" }
+    - { path: "{{ hadoop_data_root }}/tmp" }
+    - { path: "{{ hadoop_data_root }}/namenode" }
+    - { path: "{{ hadoop_data_root }}/datanode" }
+
+- name: Ensure Hadoop artifact directory exists
+  ansible.builtin.stat:
+    path: "{{ hadoop_artifact_dir }}"
+  register: hadoop_artifact_dir_stat
+
+- name: Fail when Hadoop artifact directory is missing
+  ansible.builtin.fail:
+    msg: "Missing local Hadoop artifact dir: {{ hadoop_artifact_dir }}"
+  when: not hadoop_artifact_dir_stat.stat.exists
+
+- name: Resolve Hadoop major.minor selector
+  ansible.builtin.set_fact:
+    hadoop_major_minor: "{{ hadoop_version | regex_replace('^([0-9]+\\.[0-9]+).*$','\\1') }}"
+
+- name: Pick Hadoop archive from local artifacts
+  ansible.builtin.shell: |
+    set -o pipefail
+    ls -1 "{{ hadoop_artifact_dir }}"/*.tar.gz "{{ hadoop_artifact_dir }}"/*.tgz 2>/dev/null \
+      | grep -E '/[^/]*hadoop[^/]*{{ hadoop_major_minor | replace(".", "\\.") }}([._-][0-9]+)?[^/]*\.(tar\.gz|tgz)$' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: hadoop_archive
+  changed_when: false
+  failed_when: false
+
+- name: Fail when matching Hadoop artifact is not found
+  ansible.builtin.fail:
+    msg: "No Hadoop artifact matching major.minor={{ hadoop_major_minor }} in {{ hadoop_artifact_dir }}"
+  when: hadoop_archive.stdout | trim == ''
+
+- name: Ensure Hadoop install directory exists
+  ansible.builtin.file:
+    path: "{{ hadoop_home }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0755"
+
+- name: Unarchive Hadoop into versioned home
+  ansible.builtin.unarchive:
+    src: "{{ hadoop_archive.stdout | trim }}"
+    dest: "{{ hadoop_home }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ hadoop_home }}/bin"
+
+- name: Render Hadoop config files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0644"
+  loop:
+    - { src: "core-site.xml.j2", dest: "{{ hadoop_conf_dir }}/core-site.xml" }
+    - { src: "hdfs-site.xml.j2", dest: "{{ hadoop_conf_dir }}/hdfs-site.xml" }
+    - { src: "yarn-site.xml.j2", dest: "{{ hadoop_conf_dir }}/yarn-site.xml" }
+    - { src: "mapred-site.xml.j2", dest: "{{ hadoop_conf_dir }}/mapred-site.xml" }
+    - { src: "workers.j2", dest: "{{ hadoop_conf_dir }}/workers" }
+    - { src: "hadoop-env.sh.j2", dest: "{{ hadoop_conf_dir }}/hadoop-env.sh" }
+
+- name: Install Hadoop service units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.name }}"
+    mode: "0644"
+  loop:
+    - { src: "hadoop-namenode.service.j2", name: "hadoop-namenode.service" }
+    - { src: "hadoop-resourcemanager.service.j2", name: "hadoop-resourcemanager.service" }
+    - { src: "hadoop-datanode.service.j2", name: "hadoop-datanode.service" }
+    - { src: "hadoop-nodemanager.service.j2", name: "hadoop-nodemanager.service" }
+
+- name: Reload systemd for Hadoop services
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Check if NameNode has been formatted
+  ansible.builtin.stat:
+    path: "{{ hadoop_data_root }}/namenode/current/VERSION"
+  register: namenode_version
+  when: inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Format NameNode once
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs namenode -format -force -nonInteractive"
+  become_user: "{{ hadoop_user }}"
+  when:
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+    - not namenode_version.stat.exists
+
+- name: Start NameNode service
+  ansible.builtin.systemd:
+    name: hadoop-namenode.service
+    enabled: true
+    state: started
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Start ResourceManager service
+  ansible.builtin.systemd:
+    name: hadoop-resourcemanager.service
+    enabled: true
+    state: started
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Start DataNode service
+  ansible.builtin.systemd:
+    name: hadoop-datanode.service
+    enabled: true
+    state: started
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_datanode', [])
+
+- name: Start NodeManager service
+  ansible.builtin.systemd:
+    name: hadoop-nodemanager.service
+    enabled: true
+    state: started
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_datanode', [])
+
+- name: Ensure HDFS base paths exist
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs dfs -mkdir -p {{ item }}"
+  become_user: "{{ hadoop_user }}"
+  loop:
+    - /tmp
+    - /user
+    - /user/{{ hadoop_user }}
+    - /warehouse
+  changed_when: false
+  failed_when: false
+  when: inventory_hostname in groups.get('hadoop_namenode', [])

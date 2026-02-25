@@ -1,0 +1,4 @@
+---
+pipeline_demo_enabled: true
+pipeline_demo_work_dir: /tmp/pipeline-demo
+pipeline_demo_message_count: 20

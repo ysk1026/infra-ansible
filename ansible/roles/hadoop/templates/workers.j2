@@ -1,0 +1,3 @@
+{% for h in groups.get('hadoop_datanode', []) %}
+{{ hostvars[h].ansible_host | default(h) }}
+{% endfor %}

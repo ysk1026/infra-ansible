@@ -1,0 +1,18 @@
+[Unit]
+Description=Spark History Server
+After=network.target hadoop-namenode.service
+
+[Service]
+Type=forking
+User={{ data_platform_user }}
+Group={{ data_platform_group }}
+Environment=SPARK_HOME={{ spark_home }}
+Environment=SPARK_CONF_DIR={{ spark_conf_dir }}
+Environment=HADOOP_CONF_DIR={{ hadoop_conf_dir }}
+ExecStart={{ spark_home }}/sbin/start-history-server.sh
+ExecStop={{ spark_home }}/sbin/stop-history-server.sh
+RemainAfterExit=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

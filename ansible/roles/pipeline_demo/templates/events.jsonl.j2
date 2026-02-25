@@ -1,0 +1,3 @@
+{% for i in range(1, pipeline_demo_message_count + 1) %}
+{"event_id": {{ i }}, "user_id": "u{{ '%03d' | format((i % 5) + 1) }}", "amount": {{ (i * 7) % 53 + 10 }}, "event_time": "2026-02-24T12:{{ '%02d' | format(i % 60) }}:00Z"}
+{% endfor %}

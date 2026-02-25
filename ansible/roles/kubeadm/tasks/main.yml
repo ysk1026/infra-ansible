@@ -1,0 +1,8 @@
+---
+- name: Skip kubeadm tasks when disabled
+  ansible.builtin.meta: end_role
+  when: not kubeadm_enabled
+
+- name: Placeholder for kubeadm setup
+  ansible.builtin.debug:
+    msg: "Install container runtime, kubelet/kubeadm/kubectl, then init/join cluster here."

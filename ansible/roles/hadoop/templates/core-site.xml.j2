@@ -1,0 +1,10 @@
+<configuration>
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://{{ hadoop_namenode_host }}:9000</value>
+  </property>
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>{{ hadoop_data_root }}/tmp</value>
+  </property>
+</configuration>

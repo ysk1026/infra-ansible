@@ -1,0 +1,58 @@
+---
+java_package_name: openjdk-17-jre-headless
+
+hadoop_version: "3.3.6"
+hive_version: "4.0.0"
+spark_version: "3.5.1"
+kafka_version: "3.7.0"
+impala_version: "4.3.0"
+iceberg_version: "1.6.1"
+
+# Local artifact root on target hosts (no internet download).
+local_artifact_root: /opt/artifacts
+
+# Keep install dirs versioned for safer upgrades.
+stack_root: /opt/data-platform
+hadoop_home: "{{ stack_root }}/hadoop-{{ hadoop_version }}"
+hive_home: "{{ stack_root }}/hive-{{ hive_version }}"
+spark_home: "{{ stack_root }}/spark-{{ spark_version }}"
+kafka_home: "{{ stack_root }}/kafka-{{ kafka_version }}"
+impala_home: "{{ stack_root }}/impala-{{ impala_version }}"
+
+hadoop_conf_dir: "{{ hadoop_home }}/etc/hadoop"
+hive_conf_dir: "{{ hive_home }}/conf"
+spark_conf_dir: "{{ spark_home }}/conf"
+
+# Shared deploy identity
+data_platform_user: hadoop
+data_platform_group: hadoop
+
+# Runtime dirs
+data_root: /var/lib/data-platform
+hadoop_data_root: "{{ data_root }}/hadoop"
+hive_data_root: "{{ data_root }}/hive"
+kafka_data_root: "{{ data_root }}/kafka"
+
+# Topology derived defaults
+hadoop_namenode_host: "{{ hostvars[groups['hadoop_namenode'][0]].ansible_host | default(groups['hadoop_namenode'][0]) }}"
+hive_metastore_port: 9083
+hive_server2_port: 10000
+hive_metastore_host: "{{ hostvars[groups['hadoop_edge'][0]].ansible_host | default(groups['hadoop_edge'][0]) if groups.get('hadoop_edge', []) | length > 0 else hadoop_namenode_host }}"
+hive_warehouse_dir: /warehouse/tablespace/managed/hive
+kafka_bootstrap_server: "{{ (hostvars[groups['kafka_broker'][0]].ansible_host | default(groups['kafka_broker'][0])) if groups.get('kafka_broker', []) | length > 0 else (hostvars[groups['hadoop_edge'][0]].ansible_host | default(groups['hadoop_edge'][0])) }}:9092"
+iceberg_target_dir: "{{ spark_home }}/jars"
+
+# Service toggles (set false if you want install-only)
+start_hadoop_services: true
+start_hive_services: true
+start_spark_services: true
+start_kafka_services: true
+start_impala_services: true
+
+# Pipeline demo defaults
+pipeline_demo_enabled: true
+pipeline_demo_topic: demo.events
+pipeline_demo_hdfs_raw_path: /data/raw/demo-events.json
+pipeline_demo_hdfs_curated_path: /data/curated/demo_events
+pipeline_demo_hive_db: demo
+pipeline_demo_hive_table: curated_events

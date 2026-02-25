@@ -1,0 +1,6 @@
+---
+spark_enabled: true
+spark_artifact_dir: "{{ local_artifact_root }}/spark"
+spark_conf_dir: "{{ spark_home }}/conf"
+spark_master_url: yarn
+spark_history_server_port: 18080

@@ -1,0 +1,8 @@
+---
+kafka_enabled: true
+kafka_artifact_dir: "{{ local_artifact_root }}/kafka"
+kafka_conf_dir: "{{ kafka_home }}/config"
+kafka_broker_id: 1
+kafka_listeners: PLAINTEXT://0.0.0.0:9092
+kafka_advertised_listeners: "PLAINTEXT://{{ ansible_host | default(inventory_hostname) }}:9092"
+kafka_zookeeper_connect: "{{ (hostvars[groups['kafka_zookeeper'][0]].ansible_host | default(groups['kafka_zookeeper'][0])) if groups.get('kafka_zookeeper', []) | length > 0 else (hostvars[groups['hadoop_edge'][0]].ansible_host | default(groups['hadoop_edge'][0])) }}:2181"

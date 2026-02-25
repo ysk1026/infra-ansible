@@ -1,0 +1,7 @@
+---
+hadoop_user: hadoop
+hadoop_group: hadoop
+hadoop_artifact_dir: "{{ local_artifact_root }}/hadoop"
+hadoop_conf_dir: "{{ hadoop_home }}/etc/hadoop"
+hadoop_namenode_host: "{{ hostvars[groups['hadoop_namenode'][0]].ansible_host | default(groups['hadoop_namenode'][0]) }}"
+hadoop_replication_factor: 1
