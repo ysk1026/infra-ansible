@@ -1,0 +1,13 @@
+---
+stack_validation_enabled: true
+stack_validation_timeout: 180
+
+# Default ports (override per environment if needed)
+hdfs_rpc_port: 9000
+namenode_web_port: 9870
+rm_rpc_port: 8032
+rm_web_port: 8088
+nm_web_port: 8042
+spark_history_port: 18080
+kafka_broker_port: 9092
+kafka_zookeeper_port: 2181

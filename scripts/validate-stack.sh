@@ -6,7 +6,7 @@ INFRA_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ANSIBLE_DIR="${INFRA_DIR}/ansible"
 
 INVENTORY="${ANSIBLE_INVENTORY:-${ANSIBLE_DIR}/inventory/hosts.ini}"
+PLAYBOOK="${ANSIBLE_VALIDATE_PLAYBOOK:-${ANSIBLE_DIR}/playbooks/validate_stack.yml}"
 export ANSIBLE_CONFIG="${ANSIBLE_CONFIG:-${ANSIBLE_DIR}/ansible.cfg}"
 
-ansible -i "${INVENTORY}" hadoop -b -m shell -a "systemctl is-active hadoop-namenode hadoop-resourcemanager hadoop-datanode hadoop-nodemanager || true"
-ansible -i "${INVENTORY}" hadoop_edge -b -m shell -a "systemctl is-active hive-metastore hive-server2 spark-history-server kafka-zookeeper kafka-broker || true"
+ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}" "$@"

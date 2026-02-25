@@ -1,0 +1,8 @@
+---
+- name: Validate Hadoop ecosystem ports and commands
+  hosts: hadoop
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+  roles:
+    - stack_validation

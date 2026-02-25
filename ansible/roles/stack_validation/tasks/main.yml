@@ -1,0 +1,169 @@
+---
+- name: Skip stack validation when disabled
+  ansible.builtin.meta: end_role
+  when: not stack_validation_enabled
+
+- name: Wait for NameNode RPC port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ hdfs_rpc_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Wait for NameNode web port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ namenode_web_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Wait for ResourceManager RPC port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ rm_rpc_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Wait for ResourceManager web port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ rm_web_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_namenode', [])
+
+- name: Wait for NodeManager web port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ nm_web_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - start_hadoop_services
+    - inventory_hostname in groups.get('hadoop_datanode', [])
+
+- name: Wait for Hive Metastore port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ hive_metastore_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - hive_enabled | default(true)
+    - start_hive_services
+    - inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Wait for HiveServer2 port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ hive_server2_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - hive_enabled | default(true)
+    - start_hive_services
+    - inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Wait for Spark History Server port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ spark_history_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - spark_enabled | default(true)
+    - start_spark_services
+    - inventory_hostname in groups.get('hadoop_edge', [])
+
+- name: Wait for Kafka ZooKeeper port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ kafka_zookeeper_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - kafka_enabled | default(true)
+    - start_kafka_services
+    - inventory_hostname in groups.get('kafka_zookeeper', [])
+
+- name: Wait for Kafka broker port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ kafka_broker_port }}"
+    timeout: "{{ stack_validation_timeout }}"
+  when:
+    - kafka_enabled | default(true)
+    - start_kafka_services
+    - inventory_hostname in groups.get('kafka_broker', [])
+
+- name: Validate HDFS command path
+  ansible.builtin.command: "{{ hadoop_home }}/bin/hdfs dfs -ls /"
+  become_user: "{{ data_platform_user }}"
+  register: hdfs_ls
+  changed_when: false
+  retries: 15
+  delay: 4
+  until: hdfs_ls.rc == 0
+  when:
+    - start_hadoop_services
+    - groups.get('hadoop_namenode', []) | length > 0
+    - inventory_hostname == (groups.get('hadoop_namenode', []) | first)
+
+- name: Validate YARN node registration
+  ansible.builtin.command: "{{ hadoop_home }}/bin/yarn node -list"
+  become_user: "{{ data_platform_user }}"
+  register: yarn_nodes
+  changed_when: false
+  retries: 15
+  delay: 4
+  until:
+    - yarn_nodes.rc == 0
+    - "'Total Nodes:' in yarn_nodes.stdout"
+  when:
+    - start_hadoop_services
+    - groups.get('hadoop_namenode', []) | length > 0
+    - inventory_hostname == (groups.get('hadoop_namenode', []) | first)
+
+- name: Assert at least one YARN NodeManager is registered
+  ansible.builtin.assert:
+    that:
+      - yarn_nodes.stdout is regex('(?s).*Total Nodes:\\s*[1-9][0-9]*.*')
+    fail_msg: "YARN is up but no NodeManager is registered."
+  when:
+    - start_hadoop_services
+    - groups.get('hadoop_datanode', []) | length > 0
+    - groups.get('hadoop_namenode', []) | length > 0
+    - inventory_hostname == (groups.get('hadoop_namenode', []) | first)
+
+- name: Validate Hive query execution
+  ansible.builtin.command:
+    argv:
+      - "{{ hive_home }}/bin/hive"
+      - -e
+      - "show databases;"
+  become_user: "{{ data_platform_user }}"
+  register: hive_db_check
+  changed_when: false
+  retries: 10
+  delay: 5
+  until: hive_db_check.rc == 0
+  when:
+    - hive_enabled | default(true)
+    - start_hive_services
+    - groups.get('hadoop_edge', []) | length > 0
+    - inventory_hostname == (groups.get('hadoop_edge', []) | first)
+
+- name: Validate Kafka broker command
+  ansible.builtin.command: "{{ kafka_home }}/bin/kafka-topics.sh --bootstrap-server {{ kafka_bootstrap_server }} --list"
+  register: kafka_topics
+  changed_when: false
+  retries: 10
+  delay: 4
+  until: kafka_topics.rc == 0
+  when:
+    - kafka_enabled | default(true)
+    - start_kafka_services
+    - groups.get('kafka_broker', []) | length > 0
+    - inventory_hostname == (groups.get('kafka_broker', []) | first)

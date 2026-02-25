@@ -11,6 +11,7 @@
     - kafka
     - impala
     - iceberg
+    - stack_validation
 
 - name: Kubernetes cluster bootstrap (optional)
   hosts: k8s_cluster
