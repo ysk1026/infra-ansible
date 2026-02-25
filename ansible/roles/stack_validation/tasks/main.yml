@@ -3,96 +3,146 @@
   ansible.builtin.meta: end_role
   when: not stack_validation_enabled
 
-- name: Wait for NameNode RPC port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ hdfs_rpc_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for NameNode RPC port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ hdfs_rpc_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: nn_rpc_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: nn_rpc_port_check.rc == 0
   when:
     - start_hadoop_services
     - inventory_hostname in groups.get('hadoop_namenode', [])
 
-- name: Wait for NameNode web port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ namenode_web_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for NameNode web port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ namenode_web_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: nn_web_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: nn_web_port_check.rc == 0
   when:
     - start_hadoop_services
     - inventory_hostname in groups.get('hadoop_namenode', [])
 
-- name: Wait for ResourceManager RPC port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ rm_rpc_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for ResourceManager RPC port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ rm_rpc_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: rm_rpc_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: rm_rpc_port_check.rc == 0
   when:
     - start_hadoop_services
     - inventory_hostname in groups.get('hadoop_namenode', [])
 
-- name: Wait for ResourceManager web port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ rm_web_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for ResourceManager web port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ rm_web_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: rm_web_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: rm_web_port_check.rc == 0
   when:
     - start_hadoop_services
     - inventory_hostname in groups.get('hadoop_namenode', [])
 
-- name: Wait for NodeManager web port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ nm_web_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for NodeManager web port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ nm_web_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: nm_web_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: nm_web_port_check.rc == 0
   when:
     - start_hadoop_services
     - inventory_hostname in groups.get('hadoop_datanode', [])
 
-- name: Wait for Hive Metastore port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ hive_metastore_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for Hive Metastore port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ hive_metastore_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: hive_metastore_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: hive_metastore_port_check.rc == 0
   when:
     - hive_enabled | default(true)
     - start_hive_services
     - inventory_hostname in groups.get('hadoop_edge', [])
 
-- name: Wait for HiveServer2 port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ hive_server2_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for HiveServer2 port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ hive_server2_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: hive_server2_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: hive_server2_port_check.rc == 0
   when:
     - hive_enabled | default(true)
     - start_hive_services
     - inventory_hostname in groups.get('hadoop_edge', [])
 
-- name: Wait for Spark History Server port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ spark_history_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for Spark History Server port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ spark_history_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: spark_history_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: spark_history_port_check.rc == 0
   when:
     - spark_enabled | default(true)
     - start_spark_services
     - inventory_hostname in groups.get('hadoop_edge', [])
 
-- name: Wait for Kafka ZooKeeper port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ kafka_zookeeper_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for Kafka ZooKeeper port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ kafka_zookeeper_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: kafka_zk_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: kafka_zk_port_check.rc == 0
   when:
     - kafka_enabled | default(true)
     - start_kafka_services
     - inventory_hostname in groups.get('kafka_zookeeper', [])
 
-- name: Wait for Kafka broker port
-  ansible.builtin.wait_for:
-    host: 127.0.0.1
-    port: "{{ kafka_broker_port }}"
-    timeout: "{{ stack_validation_timeout }}"
+- name: Wait for Kafka broker port listener
+  ansible.builtin.shell: |
+    ss -H -ltn | awk '$4 ~ /:{{ kafka_broker_port }}$/ {found=1} END {exit(found?0:1)}'
+  args:
+    executable: /bin/bash
+  register: kafka_broker_port_check
+  changed_when: false
+  retries: "{{ ((stack_validation_timeout | int) / (stack_validation_delay | int)) | round(0, 'ceil') | int }}"
+  delay: "{{ stack_validation_delay }}"
+  until: kafka_broker_port_check.rc == 0
   when:
     - kafka_enabled | default(true)
     - start_kafka_services

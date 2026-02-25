@@ -1,6 +1,7 @@
 ---
 stack_validation_enabled: true
 stack_validation_timeout: 180
+stack_validation_delay: 3
 
 # Default ports (override per environment if needed)
 hdfs_rpc_port: 9000
