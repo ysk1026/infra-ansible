@@ -238,6 +238,27 @@ make pipeline-demo
 - 변경은 role 단위로 작게 나누고, 버전/경로는 `group_vars/all.yml`에서 통제
 - 신규 환경도 같은 절차로 재현
 
+## 신규 환경 투입 체크리스트
+
+아래 항목을 위에서부터 체크하면, 신규 서버에서도 실패 확률을 크게 줄일 수 있습니다.
+
+- [ ] `ansible-playbook`이 컨트롤 노드에서 실행된다 (`ansible-playbook --version`)
+- [ ] 저장소 최신 상태를 받았다 (`git pull --ff-only origin main`)
+- [ ] `hosts.ini`를 환경에 맞게 작성했다 (`ansible_user`, `ansible_ssh_private_key_file`, 호스트 그룹)
+- [ ] SSH 접속이 키 기반으로 정상 동작한다 (`ansible -i ansible/inventory/hosts.ini all -m ping`)
+- [ ] sudo 권한 정책을 확인했다 (필요 시 `--ask-become-pass` 또는 NOPASSWD)
+- [ ] 타겟 서버에 `/opt/artifacts/...` 아티팩트가 모두 준비되어 있다
+- [ ] `ansible/group_vars/all.yml`의 버전/경로/서비스 토글을 환경에 맞게 조정했다
+- [ ] 적용 전 dry-run을 수행했다 (`make ansible-plan`)
+- [ ] 실제 설치/구성을 적용했다 (`make ansible-apply`)
+- [ ] 포트/기본 동작 검증을 통과했다 (`make validate-stack`)
+- [ ] 데모 파이프라인을 한 번 실행해 데이터 흐름을 확인했다 (`make pipeline-demo`)
+
+최종 통과 기준:
+- `make ansible-apply` 실패 없음
+- `make validate-stack` 실패 없음
+- `make pipeline-demo` 실패 없음
+
 ## 자주 발생하는 오류와 빠른 해결
 
 - `ansible-playbook: command not found`
