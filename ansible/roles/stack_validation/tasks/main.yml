@@ -187,11 +187,15 @@
     - groups.get('hadoop_namenode', []) | length > 0
     - inventory_hostname == (groups.get('hadoop_namenode', []) | first)
 
-- name: Validate Hive query execution
+- name: Validate Hive query execution via Beeline
   ansible.builtin.command:
     argv:
-      - "{{ hive_home }}/bin/hive"
-      - -e
+      - "{{ hive_home }}/bin/beeline"
+      - "-u"
+      - "{{ stack_validation_hive_jdbc_url }}"
+      - "-n"
+      - "{{ stack_validation_hive_jdbc_user }}"
+      - "-e"
       - "show databases;"
   become_user: "{{ data_platform_user }}"
   register: hive_db_check

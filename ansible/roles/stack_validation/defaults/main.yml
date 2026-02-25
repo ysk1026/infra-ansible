@@ -12,3 +12,7 @@ nm_web_port: 8042
 spark_history_port: 18080
 kafka_broker_port: 9092
 kafka_zookeeper_port: 2181
+stack_validation_hive_jdbc_host: "{{ hostvars[groups['hadoop_edge'][0]].ansible_host | default(groups['hadoop_edge'][0]) if groups.get('hadoop_edge', []) | length > 0 else '127.0.0.1' }}"
+stack_validation_hive_jdbc_db: default
+stack_validation_hive_jdbc_user: "{{ data_platform_user }}"
+stack_validation_hive_jdbc_url: "jdbc:hive2://{{ stack_validation_hive_jdbc_host }}:{{ hive_server2_port }}/{{ stack_validation_hive_jdbc_db }}"
